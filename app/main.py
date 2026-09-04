@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.database import engine, Base
 from app.scheduler import start_scheduler, stop_scheduler
@@ -13,11 +14,22 @@ async def lifespan(app: FastAPI):
     yield
     stop_scheduler()
 
-from app.api.webhooks import router as webhooks_router
-
 app = FastAPI(title="Revenue Resilience AI", lifespan=lifespan)
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For demo purposes
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+from app.api.webhooks import router as webhooks_router
+from app.api.ledger import router as ledger_router
+
 app.include_router(webhooks_router, prefix="/api")
+app.include_router(ledger_router, prefix="/api")
 
 @app.get("/")
 def read_root():
