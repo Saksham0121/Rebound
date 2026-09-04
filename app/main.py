@@ -9,7 +9,11 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     yield
 
+from app.api.webhooks import router as webhooks_router
+
 app = FastAPI(title="Revenue Resilience AI", lifespan=lifespan)
+
+app.include_router(webhooks_router, prefix="/api")
 
 @app.get("/")
 def read_root():
