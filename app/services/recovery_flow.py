@@ -7,6 +7,7 @@ import asyncio
 from app.models import RecoveryLedger
 from app.diagnostic_agent import diagnose_failure
 from app.policy_engine import evaluate, PolicyDecision
+from app.dispatcher import retry_subscription_charge, create_rescue_payment_link, create_afa_challenge_link
 
 async def process_payment_failure(
     event_id: str,
@@ -70,15 +71,24 @@ async def process_payment_failure(
     locked_event.lock_heartbeat = datetime.utcnow()
     await db.commit()
     
-    # 4. Dispatch (we will implement the actual Razorpay call in Step 5)
-    # For now, we simulate dispatch success
-    if decision in [PolicyDecision.APPROVE_RETRY, PolicyDecision.APPROVE_RESCUE_LINK, PolicyDecision.REQUIRE_AFA]:
+    # 4. Bounded Dispatcher
+    dispatch_result_data = None
+    if decision == PolicyDecision.APPROVE_RETRY:
+        dispatch_result_data = retry_subscription_charge("sub_fake123", event_id)
         locked_event.status = "COMPLETED"
-        locked_event.dispatch_result = "SUCCESS_STUB"
+    elif decision == PolicyDecision.APPROVE_RESCUE_LINK:
+        dispatch_result_data = create_rescue_payment_link(amount_inr, event_id)
+        locked_event.status = "COMPLETED"
+    elif decision == PolicyDecision.REQUIRE_AFA:
+        dispatch_result_data = create_afa_challenge_link(amount_inr, event_id)
+        locked_event.status = "COMPLETED"
     elif decision == PolicyDecision.SCHEDULE_NOTICE_AND_WAIT:
         locked_event.status = "PENDING_VERIFICATION"
     else:
         locked_event.status = "ESCALATED"
+        
+    if dispatch_result_data:
+        locked_event.dispatch_result = dispatch_result_data.get("action", "unknown")
         
     await db.commit()
     
