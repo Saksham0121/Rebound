@@ -1,0 +1,40 @@
+flowchart TD
+    A[Razorpay Webhook<br/>payment.failed / subscription.halted] --> B{HMAC SHA-256<br/>Signature Valid?}
+    B -- No --> B1[Reject 400<br/>Log attempt]
+    B -- Yes --> C{WAL Idempotency Lock<br/>INSERT event_id PK}
+
+    C -- Duplicate event_id --> C1[Return cached status<br/>NO reprocessing<br/>NO dispatch call]
+    C -- New event --> D[Diagnostic LLM Agent<br/>Read-only, typed output]
+
+    D --> D1{{Classification enum:<br/>TRANSIENT_CONGESTION<br/>LIQUIDITY_EXHAUSTION<br/>MANDATE_DEGRADED<br/>HARD_DECLINE<br/>DISPUTED_CHARGE}}
+
+    D1 --> E[Deterministic Policy Engine<br/>Absolute Gatekeeper]
+
+    E --> E1{Economic floor<br/>at least Rs 100?}
+    E1 -- No --> STOP1[STOP_AND_ESCALATE]
+    E1 -- Yes --> E2{Retry quota left?<br/>UPI: 3 / Card: 15}
+    E2 -- No --> STOP2[REJECT_QUOTA_EXCEEDED]
+    E2 -- Yes --> E3{Amount above<br/>Rs 15,000?}
+    E3 -- Yes --> E4[REQUIRE_AFA]
+    E3 -- No --> E5{RBI 24h pre-debit<br/>notice window elapsed?}
+    E5 -- No --> E6[Schedule notice<br/>then re-evaluate]
+    E5 -- Yes --> E7[APPROVE_RETRY /<br/>APPROVE_RESCUE_LINK]
+
+    E4 --> F[Bounded Action Dispatcher]
+    E7 --> F
+    STOP1 --> G[Recovery Ledger<br/>Audit Trail]
+    STOP2 --> G
+    E6 --> G
+
+    F --> F1[Razorpay SDK Call<br/>ONLY authenticated,<br/>policy-approved actions]
+    F1 --> F2{{subscription retry /<br/>rescue payment link /<br/>AFA challenge link}}
+    F2 --> G
+
+    G --> H[Dashboard<br/>Live status + TRV/NRE/ZDCI]
+
+    style D fill:#fff3cd,stroke:#333
+    style D1 fill:#fff3cd,stroke:#333
+    style E fill:#d4edda,stroke:#333
+    style F fill:#d1ecf1,stroke:#333
+    style C fill:#f8d7da,stroke:#333
+    style G fill:#e2e3e5,stroke:#333
