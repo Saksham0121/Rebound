@@ -1,13 +1,17 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.database import engine, Base
+from app.scheduler import start_scheduler, stop_scheduler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize DB (in production, use Alembic instead)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    
+    start_scheduler()
     yield
+    stop_scheduler()
 
 from app.api.webhooks import router as webhooks_router
 
