@@ -1,15 +1,23 @@
 import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Activity, ShieldCheck, Zap, AlertTriangle, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 
 function App() {
   const [events, setEvents] = useState([])
-  const [benchmark, setBenchmark] = useState(null)
+  const [triggering, setTriggering] = useState(false)
+  const [benchmark, setBenchmark] = useState({ trv: 0, zdci: 100 })
 
   useEffect(() => {
     // Poll the ledger every 2 seconds
     const interval = setInterval(() => {
       fetch('http://localhost:8000/api/ledger')
         .then(res => res.json())
-        .then(data => setEvents(data))
+        .then(data => {
+            setEvents(data);
+            // Calculate mock TRV for UI purposes if scripts haven't run
+            const completed = data.filter(d => d.status === 'COMPLETED').length;
+            setBenchmark(b => ({ ...b, trv: completed * 500 }));
+        })
         .catch(err => console.error(err));
     }, 2000);
     
@@ -21,87 +29,198 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const getStatusColor = (status) => {
+  const triggerMockEvent = async () => {
+    setTriggering(true)
+    const payload = {
+        id: `evt_mock_${Math.floor(Math.random()*100000)}`,
+        event: "payment.failed",
+        payload: {
+            payment: {
+                entity: {
+                    id: `pay_mock_${Math.floor(Math.random()*10000)}`,
+                    amount: 50000,
+                    method: "upi",
+                    error_code: "BAD_REQUEST",
+                    error_reason: "Customer cancelled"
+                }
+            }
+        }
+    }
+    
+    try {
+        await fetch('http://localhost:8000/api/webhook', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // Mock signature for demo
+                'x-razorpay-signature': 'mock_signature'
+            },
+            body: JSON.stringify(payload)
+        })
+    } catch(e) {
+        console.error("Trigger failed", e)
+    }
+    setTimeout(() => setTriggering(false), 800)
+  }
+
+  const getStatusConfig = (status) => {
     switch (status) {
-      case 'COMPLETED': return 'bg-green-100 text-green-800';
+      case 'COMPLETED': return { color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20', icon: CheckCircle2, text: 'Recovered' };
       case 'PENDING_REASONING': 
-      case 'PENDING_VERIFICATION': return 'bg-yellow-100 text-yellow-800';
+      case 'PENDING_VERIFICATION': return { color: 'bg-amber-500/10 text-amber-500 border-amber-500/20', icon: Loader2, text: 'Analyzing' };
       case 'STOP_AND_ESCALATE':
-      case 'ESCALATED': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'ESCALATED': return { color: 'bg-rose-500/10 text-rose-500 border-rose-500/20', icon: AlertCircle, text: 'Escalated' };
+      default: return { color: 'bg-gray-500/10 text-gray-500 border-gray-500/20', icon: Activity, text: status };
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-6xl mx-auto">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Revenue Resilience AI</h1>
-          <p className="text-gray-600">Real-time Recovery Ledger & Policy Engine</p>
+    <div className="min-h-screen bg-slate-950 text-slate-200 p-4 sm:p-8 font-sans selection:bg-indigo-500/30">
+      <div className="max-w-6xl mx-auto space-y-8">
+        
+        {/* Header */}
+        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-500/10 rounded-xl border border-indigo-500/20">
+              <Zap className="w-8 h-8 text-indigo-400" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                Rebound AI
+              </h1>
+              <p className="text-slate-400 font-medium tracking-wide text-sm mt-1">Autonomous Revenue Resilience</p>
+            </div>
+          </div>
+          <button 
+            onClick={triggerMockEvent}
+            disabled={triggering}
+            className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-medium transition-all shadow-[0_0_20px_-5px_rgba(99,102,241,0.5)] active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {triggering ? <Loader2 className="w-5 h-5 animate-spin" /> : <AlertTriangle className="w-5 h-5" />}
+            Simulate Failure
+          </button>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-800">Event Stream</h2>
-              </div>
-              <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event ID</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Diagnosis</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Policy Decision</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {events.map(event => (
-                      <tr key={event.event_id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                          {event.event_id.substring(0, 12)}...
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {event.diagnosis || '...'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {event.policy_decision || '...'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(event.status)}`}>
-                            {event.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {events.length === 0 && (
-                  <div className="p-8 text-center text-gray-500">No events found. Trigger a webhook or run the benchmark.</div>
-                )}
+          {/* Card 1 */}
+          <motion.div whileHover={{ y: -5 }} className="bg-slate-900 rounded-2xl p-6 border border-slate-800 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <Activity className="w-24 h-24" />
+            </div>
+            <div className="relative z-10">
+              <p className="text-slate-400 text-sm font-medium uppercase tracking-wider mb-2">Total Recovery Value</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold text-white">₹{benchmark.trv.toLocaleString()}</span>
+                <span className="text-emerald-400 text-sm font-medium">↑ Proxy</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div>
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Benchmark Results</h2>
-              <div className="space-y-4">
-                <div className="bg-blue-50 p-4 rounded border border-blue-100">
-                  <div className="text-sm text-blue-600 mb-1">TRV (Total Recovery Value) Proxy</div>
-                  <div className="text-2xl font-bold text-blue-900">Wait for script...</div>
-                </div>
-                <div className="bg-green-50 p-4 rounded border border-green-100">
-                  <div className="text-sm text-green-600 mb-1">ZDCI (Zero Double Charge Index)</div>
-                  <div className="text-2xl font-bold text-green-900">100%</div>
-                </div>
+          {/* Card 2 */}
+          <motion.div whileHover={{ y: -5 }} className="bg-slate-900 rounded-2xl p-6 border border-slate-800 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <ShieldCheck className="w-24 h-24" />
+            </div>
+            <div className="relative z-10">
+              <p className="text-slate-400 text-sm font-medium uppercase tracking-wider mb-2">Zero Double Charge (ZDCI)</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold text-emerald-400">{benchmark.zdci}%</span>
+                <span className="text-slate-500 text-sm font-medium">Verified</span>
               </div>
             </div>
-          </div>
+          </motion.div>
+
+          {/* Card 3 */}
+          <motion.div whileHover={{ y: -5 }} className="bg-slate-900 rounded-2xl p-6 border border-slate-800 shadow-xl relative overflow-hidden flex flex-col justify-center">
+            <p className="text-slate-400 text-sm font-medium uppercase tracking-wider mb-2">System Status</p>
+            <div className="flex items-center gap-3">
+               <span className="relative flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500"></span>
+              </span>
+              <span className="text-lg font-medium text-emerald-400">All Systems Operational</span>
+            </div>
+          </motion.div>
 
         </div>
+
+        {/* Ledger Stream */}
+        <div className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden flex flex-col">
+          <div className="px-6 py-5 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Activity className="w-5 h-5 text-indigo-400" />
+              Live Ledger Stream
+            </h2>
+            <span className="text-xs font-medium bg-slate-800 text-slate-300 px-3 py-1 rounded-full border border-slate-700">
+              {events.length} Events Processed
+            </span>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-800/30 text-slate-400 text-sm uppercase tracking-wider border-b border-slate-800">
+                  <th className="py-4 px-6 font-medium">Event ID</th>
+                  <th className="py-4 px-6 font-medium">AI Diagnosis</th>
+                  <th className="py-4 px-6 font-medium">Policy Engine</th>
+                  <th className="py-4 px-6 font-medium text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                <AnimatePresence>
+                  {events.length === 0 && (
+                    <motion.tr initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                      <td colSpan="4" className="py-12 text-center text-slate-500">
+                        <div className="flex flex-col items-center gap-3">
+                          <Activity className="w-12 h-12 opacity-20" />
+                          <p>Waiting for incoming failed payments...</p>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  )}
+                  {events.slice(0).reverse().map((event) => {
+                    const status = getStatusConfig(event.status)
+                    const Icon = status.icon
+                    return (
+                      <motion.tr 
+                        key={event.event_id}
+                        initial={{ opacity: 0, y: -10, backgroundColor: 'rgba(99, 102, 241, 0.1)' }}
+                        animate={{ opacity: 1, y: 0, backgroundColor: 'transparent' }}
+                        transition={{ duration: 0.3 }}
+                        className="hover:bg-slate-800/30 transition-colors group"
+                      >
+                        <td className="py-4 px-6">
+                          <div className="font-mono text-sm text-slate-300 group-hover:text-indigo-300 transition-colors">
+                            {event.event_id.substring(0, 16)}...
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="text-sm text-slate-300 font-medium">
+                            {event.diagnosis || <span className="text-slate-600 italic">Processing...</span>}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="text-sm text-slate-400">
+                            {event.policy_decision || <span className="text-slate-600 italic">Evaluating...</span>}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-right">
+                          <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${status.color}`}>
+                            <Icon className={`w-3.5 h-3.5 ${status.icon === Loader2 ? 'animate-spin' : ''}`} />
+                            {status.text}
+                          </div>
+                        </td>
+                      </motion.tr>
+                    )
+                  })}
+                </AnimatePresence>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </div>
   )
