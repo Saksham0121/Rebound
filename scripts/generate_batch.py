@@ -1,7 +1,7 @@
 import json
 import random
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 def generate_batch(count: int = 500, filename: str = "synthetic_batch.json"):
     events = []
@@ -24,7 +24,7 @@ def generate_batch(count: int = 500, filename: str = "synthetic_batch.json"):
                     }
                 }
             },
-            "created_at": int(datetime.utcnow().timestamp())
+            "created_at": int(datetime.now(timezone.utc).timestamp())
         })
         
     with open(filename, 'w') as f:

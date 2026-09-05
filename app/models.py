@@ -9,6 +9,7 @@ class RecoveryLedger(Base):
     payment_id = Column(String, nullable=False)
     status = Column(String, nullable=False, default='PENDING_REASONING')
     diagnosis = Column(String, nullable=True)
+    reasoning = Column(String, nullable=True)
     policy_decision = Column(String, nullable=True)
     dispatch_result = Column(String, nullable=True)
     lock_heartbeat = Column(DateTime(timezone=True), server_default=func.now())

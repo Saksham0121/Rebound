@@ -62,10 +62,12 @@ def evaluate(
     if diagnosis_classification == "MANDATE_DEGRADED":
         return PolicyDecision.APPROVE_RESCUE_LINK
     
-    # For transient issues / liquidity issues on auto-debits
-    if payment_method.lower() != "upi" and not check_rbi_notice_window(last_notice_sent_at):
-        # In a real system, you'd check if it's an auto-debit subscription specifically.
-        # We assume cards are auto-debit and require the notice here for demonstration.
-        return PolicyDecision.SCHEDULE_NOTICE_AND_WAIT
+    if diagnosis_classification == "LIQUIDITY_EXHAUSTION":
+        # For insufficient funds on non-UPI (recurring mandate), check RBI pre-debit notice
+        if payment_method.lower() != "upi" and not check_rbi_notice_window(last_notice_sent_at):
+            return PolicyDecision.SCHEDULE_NOTICE_AND_WAIT
+        # For UPI liquidity issues, send a rescue link so customer can pay via different method
+        return PolicyDecision.APPROVE_RESCUE_LINK
 
+    # TRANSIENT_CONGESTION → always safe to retry immediately
     return PolicyDecision.APPROVE_RETRY

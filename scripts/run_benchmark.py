@@ -1,5 +1,11 @@
 import json
 import asyncio
+import sys
+import os
+
+# Add the project root to sys.path so it can find the 'app' module
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from app.database import AsyncSessionLocal, Base, engine
 from app.services.recovery_flow import process_payment_failure
 

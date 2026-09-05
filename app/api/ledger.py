@@ -20,6 +20,7 @@ async def get_ledger(limit: int = 50, db: AsyncSession = Depends(get_db)):
             "payment_id": e.payment_id,
             "status": e.status,
             "diagnosis": e.diagnosis,
+            "reasoning": e.reasoning,
             "policy_decision": e.policy_decision,
             "dispatch_result": e.dispatch_result,
             "created_at": e.created_at.isoformat() if e.created_at else None

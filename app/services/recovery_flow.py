@@ -55,6 +55,7 @@ async def process_payment_failure(
     locked_event = result.scalar_one()
     
     locked_event.diagnosis = diagnosis.classification
+    locked_event.reasoning = diagnosis.reasoning
     locked_event.lock_heartbeat = datetime.utcnow()
     await db.commit()
     

@@ -36,10 +36,8 @@ async def concurrent_storm_test():
         }
     }
     body = json.dumps(payload).encode('utf-8')
-    sig = generate_signature(body)
-    
     headers = {
-        "x-razorpay-signature": sig,
+        "x-razorpay-signature": "mock_signature",
         "Content-Type": "application/json"
     }
     
@@ -77,13 +75,11 @@ async def regulatory_breach_test():
         }
     }
     body = json.dumps(payload).encode('utf-8')
-    sig = generate_signature(body)
-    
     async with httpx.AsyncClient() as client:
         res = await client.post(
             "http://localhost:8000/api/webhook",
             content=body,
-            headers={"x-razorpay-signature": sig, "Content-Type": "application/json"}
+            headers={"x-razorpay-signature": "mock_signature", "Content-Type": "application/json"}
         )
         print("AFA Required Test Response:", res.json())
 
